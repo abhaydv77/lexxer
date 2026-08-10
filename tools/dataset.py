@@ -1,9 +1,7 @@
 import json
 import logging
-import os
 import time
 import uuid
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -245,7 +243,7 @@ class DatasetToolkit:
             if engine == "pandas":
                 filtered = df.query(query)
             else:
-                con = duckdb.sql("").set_connection(None)
+                con = duckdb.connect(database=":memory:")
                 con.register(name, df)
                 filtered = con.execute(query).fetch_df()
 
@@ -449,7 +447,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "query": {"type": "string", "description": "Pandas expression (e.g. 'age > 30') or SQL statement (e.g. 'SELECT * FROM df WHERE age > 30'), depending on the engine."},
                 "engine": {"type": "string", "enum": ["pandas", "sql"], "description": "Query engine. 'pandas' treats query as a DataFrame.query() expression. 'sql' executes via DuckDB.", "default": "pandas"},
             },
-            "required": ["name", "query", "engine"],
+            "required": ["name", "query"],
         },
     },
     {
