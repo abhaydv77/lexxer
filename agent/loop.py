@@ -2,6 +2,10 @@ import json
 import os
 import sys
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from groq import Groq
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -54,7 +58,7 @@ def run_agent(user_message: str, history: list[dict] | None = None) -> str:
 
         for tc in tool_calls:
             fn_name = tc.function.name
-            args = json.loads(tc.function.arguments)
+            args = json.loads(tc.function.arguments) if tc.function.arguments else {}
             result = FUNCTIONS[fn_name](**args)
             messages.append({
                 "role": "tool",
