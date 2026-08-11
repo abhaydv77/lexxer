@@ -10,6 +10,7 @@ from groq import Groq
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.dataset import load_dataset, run_query, describe_dataset, TOOLS
+from memory.working import WorkingMemory
 
 MODEL = "openai/gpt-oss-20b"
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
@@ -36,25 +37,38 @@ TOOLS_OPENAI = [
     for t in TOOLS
 ]
 
+SYSTEM_PROMPT = "You are a data analysis agent. Use the available tools to inspect and query datasets."
 
-def run_agent(user_message: str, history: list[dict] | None = None) -> str:
-    """Run a single agent turn, invoking dataset tools as needed."""
-    if history is None:
-        history = []
-    messages = history
-    if not any(m.get("role") == "system" for m in messages):
-        messages.append({"role": "system", "content": "You are a data analysis agent. Use the available tools to inspect and query datasets."})
-    messages.append({"role": "user", "content": user_message})
+
+def run_agent(
+    user_message: str,
+    memory: WorkingMemory | None = None,
+) -> str:
+    """Run a single agent turn, invoking dataset tools as needed.
+
+    If *memory* is provided, all messages, tool calls, and results are
+    recorded there.  If *memory* is ``None`` a fresh ``WorkingMemory``
+    is created for the turn (useful for one-shot calls).
+    """
+    if memory is None:
+        memory = WorkingMemory()
+
+    # Seed memory with current user input
+    memory.set_task(user_message)
+    memory.add_message("user", user_message)
+
+    if not any(m.get("role") == "system" for m in memory.messages):
+        memory.messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
 
     while True:
         resp = client.chat.completions.create(
             model=MODEL,
-            messages=messages,
+            messages=memory.messages,
             tools=TOOLS_OPENAI,
             tool_choice="auto",
         )
         msg = resp.choices[0].message
-        messages.append(msg.model_dump(exclude_unset=True))
+        memory.add_assistant_message(msg.model_dump(exclude_unset=True))
 
         tool_calls = msg.tool_calls
         if not tool_calls:
@@ -66,15 +80,28 @@ def run_agent(user_message: str, history: list[dict] | None = None) -> str:
             if args is None:
                 args = {}
             result = FUNCTIONS[fn_name](**args)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": str(result),
-            })
+
+            # Record tool outcome in working memory
+            memory.add_tool_result(fn_name, args, result)
+
+            # If this was a dataset load, extract and store metadata
+            if fn_name == "load_dataset" and result.get("success"):
+                data = result.get("data", {})
+                ds_info = {
+                    "name": args.get("name") or args.get("path"),
+                    "sources": args.get("path"),
+                    "row_count": data.get("row_count"),
+                    "columns": data.get("columns", []),
+                    "preview": data.get("preview", []),
+                }
+                memory.set_dataset(ds_info)
+
+            # Update messages for the next LLM call
+            memory.add_tool_message(tc.id, str(result))
 
 
 if __name__ == "__main__":
-    history = []
+    memory = WorkingMemory()
     while True:
         try:
             user_input = input("\nYou: ").strip()
@@ -82,5 +109,5 @@ if __name__ == "__main__":
             break
         if not user_input:
             continue
-        response = run_agent(user_input, history)
+        response = run_agent(user_input, memory)
         print(f"\nAgent: {response}")
