@@ -1,0 +1,13 @@
+Cuisine_ID,Cuisine_name,Parent_cuisine,Region
+CUI000,Italian,European,Europe
+CUI001,Chinese,Asian,Asia
+CUI002,Mexican,Latin American,Americas
+CUI003,Indian,Asian,Asia
+CUI004,Japanese,Asian,Asia
+CUI005,American,North American,Americas
+CUI006,Thai,Asian,Asia
+CUI007,French,European,Europe
+CUI008,Mediterranean,European,Europe
+CUI009,Brazilian,Latin American,Americas
+CUI010,Burger,American,Americas
+CUI011,Pizza,Italian,Europe

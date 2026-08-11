@@ -1,0 +1,11 @@
+City,Country,Restaurant_density,Cuisine_diversity_index,Average_rating,Average_menu_price,Delivery_coverage
+New York,USA,45.77,0.991,3.96,17.9,0.866
+Los Angeles,USA,23.33,0.526,3.76,34.05,0.849
+London,United Kingdom,8.54,0.837,4.55,40.73,0.979
+Manchester,United Kingdom,11.14,0.585,4.64,23.89,0.85
+Mumbai,India,43.76,0.907,4.0,19.51,0.779
+Delhi,India,48.44,0.543,3.62,35.43,0.607
+Tokyo,Japan,43.11,0.547,4.45,49.81,0.778
+Osaka,Japan,6.53,0.984,3.88,37.48,0.835
+Sao Paulo,Brazil,17.87,0.811,4.62,13.37,0.692
+Rio de Janeiro,Brazil,30.89,0.546,4.08,27.89,0.62

@@ -1,0 +1,11 @@
+City,Country,Population,Area_km2,Urban_density,Tourism_index,Average_income,Cost_of_living_index,Weather_zone
+New York,USA,8419000,783.8,10700,1.2,85000,100,Humid subtropical
+Los Angeles,USA,3898000,1302,2990,1.1,75000,95,Mediterranean
+London,United Kingdom,8982000,1572,5700,1.3,50000,90,Oceanic
+Manchester,United Kingdom,552000,115,4800,0.8,35000,75,Oceanic
+Mumbai,India,12442000,603,20633,0.9,15000,40,Tropical wet and dry
+Delhi,India,16787000,1484,11312,1.1,14000,38,Humid subtropical
+Tokyo,Japan,13929000,2194,6349,1.4,45000,85,Humid subtropical
+Osaka,Japan,2691000,223,12067,1.0,40000,80,Humid subtropical
+Sao Paulo,Brazil,12325000,1521,8100,0.8,12000,50,Humid subtropical
+Rio de Janeiro,Brazil,6747000,1200,5622,1.2,11000,55,Tropical savanna

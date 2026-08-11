@@ -1,0 +1,6 @@
+Country,Region,Income_group,Currency,Timezone,ISO_code
+USA,North America,High income,USD,America/New_York,US
+United Kingdom,Europe,High income,GBP,Europe/London,GB
+India,Asia,Lower middle income,INR,Asia/Kolkata,IN
+Japan,Asia,High income,JPY,Asia/Tokyo,JP
+Brazil,South America,Upper middle income,BRL,America/Sao_Paulo,BR
