@@ -67,7 +67,7 @@ def describe_dataset() -> dict[str, Any]:
 
 
 def run_query(query: str) -> dict[str, Any]:
-    """Run a SQL query via DuckDB against the loaded DataFrame and return up to 20 rows."""
+    """Run a SQL query via DuckDB against the loaded DataFrame (registered as 'df') and return up to 20 rows. Use 'df' as the table name in queries."""
     start = time.perf_counter()
     try:
         if _df is None:
@@ -127,7 +127,7 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "SQL query string to execute against the dataframe."},
+                "query": {"type": "string", "description": "SQL query string to execute against the dataframe. Use 'df' as the table name (e.g. SELECT * FROM df WHERE ...)."},
             },
             "required": ["query"],
         },

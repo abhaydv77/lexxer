@@ -11,7 +11,7 @@ from groq import Groq
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.dataset import load_dataset, run_query, describe_dataset, TOOLS
 
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "openai/gpt-oss-20b"
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 FUNCTIONS = {
@@ -39,7 +39,11 @@ TOOLS_OPENAI = [
 
 def run_agent(user_message: str, history: list[dict] | None = None) -> str:
     """Run a single agent turn, invoking dataset tools as needed."""
-    messages = history or []
+    if history is None:
+        history = []
+    messages = history
+    if not any(m.get("role") == "system" for m in messages):
+        messages.append({"role": "system", "content": "You are a data analysis agent. Use the available tools to inspect and query datasets."})
     messages.append({"role": "user", "content": user_message})
 
     while True:
@@ -59,6 +63,8 @@ def run_agent(user_message: str, history: list[dict] | None = None) -> str:
         for tc in tool_calls:
             fn_name = tc.function.name
             args = json.loads(tc.function.arguments) if tc.function.arguments else {}
+            if args is None:
+                args = {}
             result = FUNCTIONS[fn_name](**args)
             messages.append({
                 "role": "tool",
