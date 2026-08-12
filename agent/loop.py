@@ -11,6 +11,7 @@ from groq import Groq
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.dataset import load_dataset, run_query, describe_dataset, TOOLS
 from memory.working import WorkingMemory
+from harness.context import ContextBuilder
 
 MODEL = "openai/gpt-oss-20b"
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
@@ -39,6 +40,8 @@ TOOLS_OPENAI = [
 
 SYSTEM_PROMPT = "You are a data analysis agent. Use the available tools to inspect and query datasets."
 
+context_builder = ContextBuilder(system_instructions=SYSTEM_PROMPT)
+
 
 def run_agent(
     user_message: str,
@@ -61,9 +64,10 @@ def run_agent(
         memory.messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
 
     while True:
+        context = context_builder.build(memory, tools=TOOLS)
         resp = client.chat.completions.create(
             model=MODEL,
-            messages=memory.messages,
+            messages=context.to_messages(),
             tools=TOOLS_OPENAI,
             tool_choice="auto",
         )
