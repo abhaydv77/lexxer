@@ -99,12 +99,12 @@ def test_memory_persists_across_calls():
 
 def test_agent_executes_tools_through_runtime():
     """The agent loop routes tool calls through the ToolRuntime."""
-    from agent.loop import run_agent, tool_runtime
-    from harness.runtime import ToolResult
+    from agent.loop import run_agent
 
-    tool_calls = [
-        MagicMock(id="tc1", function=MagicMock(name="load_dataset", arguments='{"path": "data/cities.csv"}'))
-    ]
+    fn = MagicMock()
+    fn.name = "load_dataset"
+    fn.arguments = '{"path": "data/cities.csv"}'
+    tool_calls = [MagicMock(id="tc1", function=fn)]
 
     # 1. LLM requests a tool call
     # 2. runtime executes it
@@ -130,9 +130,10 @@ def test_agent_handles_unknown_tool_gracefully():
     """If the LLM requests an unregistered tool, the agent loop survives."""
     from agent.loop import run_agent
 
-    tool_calls = [
-        MagicMock(id="tc1", function=MagicMock(name="nonexistent_tool", arguments="{}"))
-    ]
+    fn = MagicMock()
+    fn.name = "nonexistent_tool"
+    fn.arguments = "{}"
+    tool_calls = [MagicMock(id="tc1", function=fn)]
 
     with patch("agent.loop.client") as mock_client:
         responses = [
