@@ -2,7 +2,7 @@
 
 ### A Data Analyst Agent built as an Agent Harness Engineering project.
 
-Lexxer is an experimental AI data analyst designed to explore **harness engineering** — building the systems around an LLM that make an agent more reliable, observable, and capable of working through multi-step tasks.
+Lexxer is an experimental AI data analyst designed to explore **harness engineering** building the systems around an LLM that make an agent more reliable, observable, and capable of working through multi-step tasks.
 
 Instead of focusing only on the model, Lexxer focuses on the environment the model operates inside: **memory, context management, tool execution, validation, tracing, evaluation, and observability.**
 
