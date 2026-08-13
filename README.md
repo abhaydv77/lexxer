@@ -1,4 +1,4 @@
-# Lexxer
+# Lexxer 🚧
 
 ### A Data Analyst Agent built as an Agent Harness Engineering project.
 
