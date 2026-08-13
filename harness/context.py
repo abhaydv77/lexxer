@@ -105,7 +105,7 @@ class ContextBuilder:
 
         return "\n".join(parts)
 
-    # ── formatters ─────────────────────────────────────────────────────
+    # ── formatters
 
     @staticmethod
     def _format_dataset(dataset: dict[str, Any]) -> str:
