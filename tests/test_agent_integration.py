@@ -95,3 +95,58 @@ def test_memory_persists_across_calls():
         assert len(user_msgs) == 2
         assert user_msgs[0]["content"] == "First message"
         assert user_msgs[1]["content"] == "Second message"
+
+
+def test_agent_executes_tools_through_runtime():
+    """The agent loop routes tool calls through the ToolRuntime."""
+    from agent.loop import run_agent, tool_runtime
+    from harness.runtime import ToolResult
+
+    tool_calls = [
+        MagicMock(id="tc1", function=MagicMock(name="load_dataset", arguments='{"path": "data/cities.csv"}'))
+    ]
+
+    # 1. LLM requests a tool call
+    # 2. runtime executes it
+    # 3. LLM returns final answer
+    with patch("agent.loop.client") as mock_client:
+        responses = [
+            _make_mock_response(None, tool_calls=tool_calls),
+            _make_mock_response("Dataset loaded!", tool_calls=[]),
+        ]
+        mock_client.chat.completions.create = MagicMock(side_effect=responses)
+
+        memory = WorkingMemory()
+        result = run_agent("Load data/cities.csv", memory)
+
+        assert result == "Dataset loaded!"
+        # Tool executed via runtime: memory has the tool result
+        results = memory.get_tool_results()
+        assert len(results) == 1
+        assert results[0].name == "load_dataset"
+
+
+def test_agent_handles_unknown_tool_gracefully():
+    """If the LLM requests an unregistered tool, the agent loop survives."""
+    from agent.loop import run_agent
+
+    tool_calls = [
+        MagicMock(id="tc1", function=MagicMock(name="nonexistent_tool", arguments="{}"))
+    ]
+
+    with patch("agent.loop.client") as mock_client:
+        responses = [
+            _make_mock_response(None, tool_calls=tool_calls),
+            _make_mock_response("I don't have that tool", tool_calls=[]),
+        ]
+        mock_client.chat.completions.create = MagicMock(side_effect=responses)
+
+        memory = WorkingMemory()
+        result = run_agent("Do something", memory)
+
+        assert result == "I don't have that tool"
+        # The failure was recorded, not raised
+        results = memory.get_tool_results()
+        assert len(results) == 1
+        assert results[0].result["success"] is False
+        assert results[0].result["error"] is not None

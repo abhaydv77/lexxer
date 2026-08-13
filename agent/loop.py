@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.dataset import load_dataset, run_query, describe_dataset, TOOLS
 from memory.working import WorkingMemory
 from harness.context import ContextBuilder
+from harness.runtime import ToolRuntime
 
 MODEL = "openai/gpt-oss-20b"
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
@@ -21,6 +22,9 @@ FUNCTIONS = {
     "run_query": run_query,
     "describe_dataset": describe_dataset,
 }
+
+tool_runtime = ToolRuntime()
+tool_runtime.register_all(FUNCTIONS, TOOLS)
 
 TOOLS_OPENAI = [
     {
@@ -83,7 +87,10 @@ def run_agent(
             args = json.loads(tc.function.arguments) if tc.function.arguments else {}
             if args is None:
                 args = {}
-            result = FUNCTIONS[fn_name](**args)
+
+            # Execute the tool through the runtime (execution boundary)
+            exec_result = tool_runtime.execute(fn_name, args)
+            result = exec_result.as_dict()
 
             # Record tool outcome in working memory
             memory.add_tool_result(fn_name, args, result)
