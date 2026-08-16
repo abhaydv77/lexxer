@@ -170,9 +170,6 @@ class Validator:
         agg_func = match.group(1).upper()
         column = match.group(2)
 
-        agg_func = match.group(1).upper()
-        column = match.group(2)
-
         df = context.dataset
         if df is None:
             return ValidationResult(
