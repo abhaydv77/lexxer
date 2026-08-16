@@ -10,10 +10,10 @@ The harness answers *"how do tools actually get executed, and what context does 
 |------|---------|
 | `context.py` | `ContextBuilder` + `BuiltContext` — transforms Working Memory state into LLM-ready context |
 | `runtime.py` | `ToolRuntime` + `ToolResult` — the execution boundary that runs tools requested by the agent |
+| `validator.py` | `Validator` + `ValidationResult` — verifies tool results independently before trusting them |
 
 Empty placeholder files (future phases, not yet implemented):
 - `guardrails.py`
-- `validator.py`
 
 ---
 
@@ -158,48 +158,108 @@ The Agent Loop owns LLM calls, tool-call detection, loop continuation, and final
 ```python
 exec_result = tool_runtime.execute(fn_name, args)
 result = exec_result.as_dict()
+
+# Validate before trusting
+ctx = ValidationContext(dataset=dataset_module._df)
+validation = validator.validate(exec_result, context=ctx)
+
+# Store result + validation in Working Memory
 memory.add_tool_result(fn_name, args, result)
+memory.add_validation_result(validation)
 ```
 
-A clear boundary for future safety mechanisms (permission/guardrail → sandbox → tool).
+---
+
+## Validator (`validator.py`)
+
+The **verification layer** that independently checks tool results before the agent trusts them.
+
+```text
+ToolRuntime.execute()  →  ToolResult  →  Validator  →  ValidationResult  →  Working Memory
+                                             ↑
+                                      ValidationContext
+                                        (source dataset)
+```
+
+### Key idea: never trust the tool's output
+
+The validator recomputes expected values from the source dataset rather than trusting the tool's reported result. For example, if a tool claims `AVG(Average_income) = 42500`, the validator independently computes `df["Average_income"].mean()` and compares.
+
+### Design
+
+- `Validator` is **stateless** — receives `(tool_result, context)` → returns `ValidationResult`.
+- `ValidationContext` carries the source `pd.DataFrame` needed for independent recomputation.
+- The default handler registered for `run_query` detects SQL aggregates (`AVG`, `SUM`, `MIN`, `MAX`, `COUNT`) in the query, parses the column name (preserving case), recomputes via pandas, and compares with `math.isclose(rel_tol=1e-6, abs_tol=1e-6)`.
+- Tools without a registered validator pass through as *valid*.
+- The validator **never crashes** — exceptions are caught and returned as `ValidationResult`.
+- Failed tool executions are skipped, not re-validated.
+
+### Usage
+
+```python
+from harness.validator import Validator, ValidationContext
+
+validator = Validator()
+
+result = runtime.execute("run_query", {"query": "SELECT AVG(Average_income) FROM df"})
+ctx = ValidationContext(dataset=df)
+validation = validator.validate(result, context=ctx)
+
+if validation.valid:
+    print(f"Verified: {validation.expected} == {validation.actual}")
+else:
+    print(f"FAILED: {validation.error}")
+    # surfaced to the agent via a message in Working Memory
+```
+
+### Registering custom validators
+
+```python
+validator.register("my_tool", my_handler_fn)
+validator.unregister("my_tool")
+```
 
 ---
 
 ## Current architecture
 
 ```text
-                    ┌──────────────────┐
-                    │      User        │
-                    └────────┬─────────┘
-                             ↓
-                    ┌──────────────────┐
-                    │  Working Memory  │
-                    └────────┬─────────┘
-                             ↓
-                    ┌──────────────────┐
-                    │ Context Builder  │
-                    └────────┬─────────┘
-                             ↓
-                    ┌──────────────────┐
-                    │   Agent Loop     │
-                    └────────┬─────────┘
-                             ↓
-                       Tool Call
-                             ↓
-                    ┌──────────────────┐
-                    │   Tool Runtime   │
-                    └────────┬─────────┘
-                             ↓
-                    ┌──────────────────┐
-                    │      Tool        │
-                    └────────┬─────────┘
-                             ↓
-                       ToolResult
-                             ↓
-                    ┌──────────────────┐
-                    │  Working Memory  │
-                    └──────────────────┘
-```
+                     ┌──────────────────┐
+                     │      User        │
+                     └────────┬─────────┘
+                              ↓
+                     ┌──────────────────┐
+                     │  Working Memory  │
+                     └────────┬─────────┘
+                              ↓
+                     ┌──────────────────┐
+                     │ Context Builder  │
+                     └────────┬─────────┘
+                              ↓
+                     ┌──────────────────┐
+                     │   Agent Loop     │
+                     └────────┬─────────┘
+                              ↓
+                        Tool Call
+                              ↓
+                     ┌──────────────────┐
+                     │   Tool Runtime   │
+                     └────────┬─────────┘
+                              ↓
+                     ┌──────────────────┐
+                     │      Tool        │
+                     └────────┬─────────┘
+                              ↓
+                        ToolResult
+                              ↓
+                     ┌──────────────────┐
+                     │     Validator    │
+                     └────────┬─────────┘
+                              ↓
+                     ┌──────────────────┐
+                     │  Working Memory  │
+                     └──────────────────┘
+ ```
 
 ## Design principles
 
@@ -209,20 +269,20 @@ A clear boundary for future safety mechanisms (permission/guardrail → sandbox 
 - Independent from any dashboard/frontend
 - The Tool Runtime is usable without knowing anything about the LLM
 
-## Future phases (not yet implemented)
+### Future phases (not yet implemented)
 
 The harness is designed to grow incrementally. Future layers will slot around the existing pieces:
 
 ```text
 Agent
  ↓
-Tool Runtime
- ↓
 Permission / Guardrail   ← future
  ↓
 Sandbox                  ← future
  ↓
 Tool
+ ↓
+Validator (already implemented)
 ```
 
-Plus Tracing, Validation, and Evaluation systems — each will consume the execution metadata (`duration_ms`) the runtime already exposes.
+Plus Tracing, Evaluation, and Observability systems — each will consume the execution metadata (`duration_ms`) the runtime already exposes.
