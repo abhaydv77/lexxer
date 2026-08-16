@@ -21,44 +21,44 @@ User → LLM → Answer
 Lexxer explores what happens when we build an actual harness around that agent:
 
 ```text
-                         ┌──────────────────┐
-                         │      User        │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │  Working Memory  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Context Builder  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │      Agent       │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │   Tool Runtime   │
-                         └────────┬─────────┘
-                                  │
+                      ┌──────────────────┐
+                      │      User        │
+                      └────────┬─────────┘
+                              │
+                              ▼
+                      ┌──────────────────┐
+                      │  Working Memory  │
+                      └────────┬─────────┘
+                              │
+                              ▼
+                      ┌──────────────────┐
+                      │ Context Builder  │
+                      └────────┬─────────┘
+                              │
+                              ▼
+                      ┌──────────────────┐
+                      │      Agent       │
+                      └────────┬─────────┘
+                              │
+                              ▼
+                      ┌──────────────────┐
+                      │   Tool Runtime   │
+                      └────────┬─────────┘
+                              │
                     ┌─────────────┼─────────────┐
                     ▼             ▼             ▼
                  Dataset       Python        Charts
                    Tool          Tool          Tool
-                    │             │             │
-                    └─────────────┼─────────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │    Validator     │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                              Response
+                     │             │             │
+                     └─────────────┼─────────────┘
+                              │
+                              ▼
+                      ┌──────────────────┐
+                      │    Validator     │
+                      └────────┬─────────┘
+                              │
+                              ▼
+                          Response
 ```
 
 The architecture is intentionally being built incrementally.
@@ -71,9 +71,9 @@ The architecture is intentionally being built incrementally.
 * [x] Dataset analysis tools
 * [x] Working Memory
 * [x] Context Builder
-* [ ] Tool Runtime
+* [x] Tool Runtime
 * [ ] Guardrails
-* [ ] Output Validation
+* [x] Output Validation
 * [ ] Tracing
 * [ ] Semantic Memory
 * [ ] Episodic Memory
@@ -170,7 +170,7 @@ The runtime will eventually provide consistent execution, error handling, and ob
 
 ### Validator
 
-The validator will independently check important agent outputs.
+The Validator independently verifies tool outputs by recomputing results from the source dataset.
 
 For example:
 
@@ -184,7 +184,9 @@ Actual dataset value = $38,200
 ❌ Invalid
 ```
 
-The goal is to reduce incorrect analytical conclusions and provide a mechanism for retrying or correcting failed operations.
+On failure, the validator surfaces a correction message back to the agent so it can retry. This reduces incorrect analytical conclusions and provides a deterministic mechanism for retrying or correcting failed operations.
+
+See [`harness/validator.py`](harness/validator.py) for implementation details.
 
 ---
 
@@ -351,7 +353,7 @@ lexxer/
 ├── harness/
 │   ├── context.py
 │   ├── runtime.py
-│   └── ...
+│   └── validator.py
 │
 ├── tracing/
 │   └── ...
