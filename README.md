@@ -74,7 +74,7 @@ The architecture is intentionally being built incrementally.
 * [x] Tool Runtime
 * [ ] Guardrails
 * [x] Output Validation
-* [ ] Tracing
+* [x] Tracing
 * [ ] Semantic Memory
 * [ ] Episodic Memory
 * [ ] Retrieval Gate
@@ -192,19 +192,23 @@ See [`harness/validator.py`](harness/validator.py) for implementation details.
 
 ### Tracing
 
-Tracing will record the agent's execution lifecycle:
+Tracing records what happens during an agent run — a structured history of events that the dashboard will eventually visualize.
 
 ```text
-Run
- ├── Context created
- ├── LLM call
- ├── Tool call
- ├── Tool result
- ├── Validation
- └── Final response
+Agent Run
+ ├── run_started
+ ├── context_built
+ ├── llm_call
+ ├── tool_call → tool_completed
+ ├── validation
+ ├── llm_call
+ ├── response_generated
+ └── run_completed
 ```
 
-This will eventually power the Lexxer overview dashboard and make agent behavior easier to inspect and debug.
+Each event captures timestamps, durations (reused from ToolResult and Validator — no duplicate timers), and structured metadata (tool name, validator name, expected/actual values, LLM provider/model).
+
+See the [tracing README](tracing/README.md) for details.
 
 ---
 
@@ -342,6 +346,9 @@ lexxer/
 │   ├── loop.py
 │   └── models.py
 │
+├── tracing/
+│   └── tracer.py
+│
 ├── tools/
 │   ├── dataset.py
 │   └── ...
@@ -402,6 +409,67 @@ Areas being explored include:
 🚧 **Active development**
 
 Lexxer is being built incrementally. New components are intentionally added one at a time so that each part of the harness can be understood, tested, and evaluated independently.
+
+---
+
+## Backend MVP — Complete
+
+The core harness backend is now complete. The following components are implemented and tested:
+
+| Component | File | Tests |
+|-----------|------|-------|
+| Agent Loop | `agent/loop.py` | 6 |
+| Working Memory | `memory/working.py` | 19 |
+| Context Builder | `harness/context.py` | 11 |
+| Tool Runtime | `harness/runtime.py` | 17 |
+| Validator | `harness/validator.py` | 11 |
+| Tracer | `tracing/tracer.py` | 14 |
+
+```text
+                         USER
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Working Memory  │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │ Context Builder │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │   Agent Loop    │
+                  └────────┬────────┘
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │  Tool Runtime   │
+                  └────────┬────────┘
+                           │
+                           ▼
+                         TOOLS
+                           │
+                           ▼
+                     Tool Result
+                           │
+                           ▼
+                  ┌─────────────────┐
+                  │    Validator    │
+                  └────────┬────────┘
+                           │
+                           ▼
+                    Final Response
+
+                 ┌───────────────────┐
+                 │      TRACER       │
+                 │  Observing the    │
+                 │  entire lifecycle │
+                 └───────────────────┘
+```
+
+**What's next:** Frontend dashboard to visualize runs, traces, and agent behavior using the trace data.
 
 ---
 
