@@ -13,6 +13,8 @@ from tools.dataset import load_dataset, run_query, describe_dataset, TOOLS
 from memory.working import WorkingMemory
 from harness.context import ContextBuilder
 from harness.runtime import ToolRuntime
+from harness.validator import Validator, ValidationContext
+import tools.dataset as dataset_module
 
 MODEL = "openai/gpt-oss-20b"
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
@@ -25,6 +27,8 @@ FUNCTIONS = {
 
 tool_runtime = ToolRuntime()
 tool_runtime.register_all(FUNCTIONS, TOOLS)
+
+validator = Validator()
 
 TOOLS_OPENAI = [
     {
@@ -92,8 +96,17 @@ def run_agent(
             exec_result = tool_runtime.execute(fn_name, args)
             result = exec_result.as_dict()
 
+            # Validate the result before trusting it
+            ctx = ValidationContext(dataset=dataset_module._df)
+            validation = validator.validate(exec_result, context=ctx)
+
             # Record tool outcome in working memory
             memory.add_tool_result(fn_name, args, result)
+
+            # Attach validation result to the most recent tool result
+            if memory.tool_results:
+                memory.tool_results[-1].validation = validation
+            memory.add_validation_result(validation)
 
             # If this was a dataset load, extract and store metadata
             if fn_name == "load_dataset" and result.get("success"):
@@ -106,6 +119,19 @@ def run_agent(
                     "preview": data.get("preview", []),
                 }
                 memory.set_dataset(ds_info)
+
+            # If validation failed, surface the failure to the agent so it
+            # can retry / correct, without silently replacing the result.
+            if not validation.valid:
+                memory.add_message(
+                    "user",
+                    f"VALIDATION FAILED for '{fn_name}'.\n"
+                    f"Validator: {validation.validator_name}\n"
+                    f"Expected: {validation.expected}\n"
+                    f"Actual:   {validation.actual}\n"
+                    f"Error: {validation.error or 'N/A'}\n"
+                    f"Please recalculate or correct the result.",
+                )
 
             # Update messages for the next LLM call
             memory.add_tool_message(tc.id, str(result))

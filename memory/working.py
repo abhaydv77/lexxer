@@ -14,6 +14,8 @@ class ToolResult:
     arguments: dict[str, Any]
     result: dict[str, Any]
     duration_ms: float | None = None
+    validation: Any = None  # Optional ValidationResult, set by the harness
+
 
     def summarize(self) -> str:
         """Return a concise text summary suitable for inclusion in an LLM prompt."""
@@ -27,22 +29,27 @@ class ToolResult:
         if dur is not None:
             parts[-1] += f" ({dur}ms)"
 
-        if success:
-            if "row_count" in data:
-                parts.append(f"  rows: {data['row_count']}")
-            if "columns" in data:
-                cols = ", ".join(
-                    f"{c['name']}({c['dtype']})" for c in data["columns"]
-                )
-                parts[-1] += f"\n  columns: {cols}"
-            if "rows" in data and data["rows"]:
-                n = data.get("row_count", 0)
-                trunc = data.get("truncated", False)
-                parts.append(f"  rows: {n}" + (" (truncated)" if trunc else ""))
-                parts.append(f"  preview: {data['rows'][:3]}")
-        else:
-            err = self.result.get("error", "")
-            parts[-1] += f"\n  error: {err}"
+            if success:
+                if "row_count" in data:
+                    parts.append(f"  rows: {data['row_count']}")
+                if "columns" in data:
+                    cols = ", ".join(
+                        f"{c['name']}({c['dtype']})" for c in data["columns"]
+                    )
+                    parts[-1] += f"\n  columns: {cols}"
+                if "rows" in data and data["rows"]:
+                    n = data.get("row_count", 0)
+                    trunc = data.get("truncated", False)
+                    parts.append(f"  rows: {n}" + (" (truncated)" if trunc else ""))
+                    parts.append(f"  preview: {data['rows'][:3]}")
+            else:
+                err = self.result.get("error", "")
+                parts[-1] += f"\n  error: {err}"
+
+        # Append validation status if present
+        if self.validation is not None:
+            status = "PASS" if self.validation.valid else "FAIL"
+            parts.append(f"  validation: {status} ({self.validation.validator_name})")
 
         return "\n".join(parts)
 
@@ -62,6 +69,7 @@ class WorkingMemory:
     dataset: dict[str, Any] | None = None
     dataset_schema: list[dict[str, str]] | None = None
     tool_results: list[ToolResult] = field(default_factory=list)
+    validation_results: list["Any"] = field(default_factory=list)
     analysis_state: dict[str, Any] = field(default_factory=dict)
 
     # ── messages ──────────────────────────────────────────────────────
@@ -155,6 +163,19 @@ class WorkingMemory:
             return "No tool results yet."
         lines = [tr.summarize() for tr in self.tool_results]
         return "\n".join(lines)
+
+    def attach_validation(self, tool_index: int, validation: Any) -> None:
+        """Attach a ValidationResult to the most recent tool result."""
+        if 0 <= tool_index < len(self.tool_results):
+            self.tool_results[tool_index].validation = validation
+
+    def add_validation_result(self, validation: Any) -> None:
+        """Record a standalone ValidationResult (kept for tracing)."""
+        self.validation_results.append(validation)
+
+    def get_validation_results(self) -> list[Any]:
+        """Return a copy of the validation-results list."""
+        return list(self.validation_results)
 
     # ── analysis state ────────────────────────────────────────────────
 
