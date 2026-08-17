@@ -58,6 +58,7 @@ def run_agent(
     user_message: str,
     memory: WorkingMemory | None = None,
     trace: Tracer | None = None,
+    run_id: str | None = None,
 ) -> str:
     """Run a single agent turn, invoking dataset tools as needed.
 
@@ -70,6 +71,9 @@ def run_agent(
     the response via the function's ``trace_id`` attribute — however, for
     simplicity this function returns just the response string.  To capture
     the trace, pass an existing ``Tracer`` instance.
+
+    If *run_id* is provided, it is used as the trace run identifier;
+    otherwise the ``Tracer`` generates one.
     """
     if memory is None:
         memory = WorkingMemory()
@@ -77,7 +81,7 @@ def run_agent(
     if trace is None:
         trace = Tracer()
 
-    trace.start_run()
+    trace.start_run(run_id=run_id)
 
     # Seed memory with current user input
     memory.set_task(user_message)
