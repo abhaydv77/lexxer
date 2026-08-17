@@ -80,7 +80,7 @@ The architecture is intentionally being built incrementally.
 * [ ] Retrieval Gate
 * [ ] Memory Consolidation
 * [ ] Evaluation System
-* [ ] Overview Dashboard
+* [x] Frontend API (FastAPI layer)
 
 ---
 
@@ -342,6 +342,12 @@ A dedicated overview dashboard for inspecting:
 ```text
 lexxer/
 │
+├── api/
+│   ├── main.py        # FastAPI app + CORS
+│   ├── service.py     # AgentService (orchestrates the harness)
+│   ├── schemas.py     # Pydantic request/response models
+│   └── routes/        # health, chat, runs, dataset endpoints
+│
 ├── agent/
 │   ├── loop.py
 │   └── models.py
@@ -370,6 +376,9 @@ lexxer/
 │
 ├── dashboard/
 │   └── ...
+│
+├── docs/
+│   └── API.md
 │
 ├── data/
 │   └── sample/
@@ -470,6 +479,44 @@ The core harness backend is now complete. The following components are implement
 ```
 
 **What's next:** Frontend dashboard to visualize runs, traces, and agent behavior using the trace data.
+
+---
+
+## Frontend API
+
+Lexxer exposes a small REST API (FastAPI) so a separate frontend can consume the backend. The API sits **above** the harness — it only orchestrates the existing agent, it does not reimplement it:
+
+```text
+Frontend
+   ↓
+FastAPI
+   ↓
+AgentService
+   ↓
+Lexxer Harness (Working Memory → Context Builder → Agent Loop → Tool Runtime → Validator → Tracer)
+```
+
+### Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/health` | Liveness check |
+| `POST` | `/api/chat` | Send a user query through the agent |
+| `GET` | `/api/runs` | Recent run history (newest first) |
+| `GET` | `/api/runs/{run_id}` | Full trace for a single run |
+| `GET` | `/api/dataset` | Basic info about the loaded dataset |
+
+See [docs/API.md](docs/API.md) for request/response schemas and examples.
+
+### Starting the backend
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn api.main:app --reload --port 8000
+```
+
+The API is then available at <http://localhost:8000> (interactive docs at <http://localhost:8000/docs>).
 
 ---
 
