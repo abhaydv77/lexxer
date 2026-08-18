@@ -9,6 +9,10 @@ Instead of focusing only on the model, Lexxer focuses on the environment the mod
 > **The goal isn't to build the smartest agent. It's to build a better environment for an agent to work in.**
 
 ---
+## SCREENSHOT
+<img width="1440" height="900" alt="Screenshot 2026-08-18 at 3 40 13 PM" src="https://github.com/user-attachments/assets/5d35ce08-2df6-4394-88c2-e4097b3f5915" />
+
+
 
 ## Why Lexxer?
 
