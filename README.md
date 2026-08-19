@@ -24,46 +24,8 @@ User → LLM → Answer
 
 Lexxer explores what happens when we build an actual harness around that agent:
 
-```text
-                      ┌──────────────────┐
-                      │      User        │
-                      └────────┬─────────┘
-                              │
-                              ▼
-                      ┌──────────────────┐
-                      │  Working Memory  │
-                      └────────┬─────────┘
-                              │
-                              ▼
-                      ┌──────────────────┐
-                      │ Context Builder  │
-                      └────────┬─────────┘
-                              │
-                              ▼
-                      ┌──────────────────┐
-                      │      Agent       │
-                      └────────┬─────────┘
-                              │
-                              ▼
-                      ┌──────────────────┐
-                      │   Tool Runtime   │
-                      └────────┬─────────┘
-                              │
-                    ┌─────────────┼─────────────┐
-                    ▼             ▼             ▼
-                 Dataset       Python        Charts
-                   Tool          Tool          Tool
-                     │             │             │
-                     └─────────────┼─────────────┘
-                              │
-                              ▼
-                      ┌──────────────────┐
-                      │    Validator     │
-                      └────────┬─────────┘
-                              │
-                              ▼
-                          Response
-```
+<img width="803" height="570" alt="Screenshot 2026-08-19 at 1 47 32 PM" src="https://github.com/user-attachments/assets/1326f578-a430-4b2e-adfa-19e694a8abf2" />
+
 
 The architecture is intentionally being built incrementally.
 
