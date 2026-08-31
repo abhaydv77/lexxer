@@ -250,3 +250,146 @@ def test_agent_trace_captures_error():
         # Tool execution failure is handled by runtime, not a crash
         # So run should still complete successfully
         assert run.status == "success"
+
+
+# ── Bounded iteration tests ──────────────────────────────────────────────────
+
+
+def test_agent_finishes_before_max_iterations():
+    """Agent completes normally when LLM returns no tool calls before limit."""
+    from agent.loop import run_agent
+
+    fn = MagicMock()
+    fn.name = "load_dataset"
+    fn.arguments = '{"path": "data/cities.csv"}'
+    tool_calls = [MagicMock(id="tc1", function=fn)]
+
+    with patch("agent.loop.client") as mock_client:
+        # Two iterations: tool call -> final response
+        responses = [
+            _make_mock_response(None, tool_calls=tool_calls),
+            _make_mock_response("Dataset loaded!", tool_calls=[]),
+        ]
+        mock_client.chat.completions.create = MagicMock(side_effect=responses)
+
+        memory = WorkingMemory()
+        tracer = Tracer()
+        result = run_agent("Load data", memory, trace=tracer, max_iterations=5)
+
+        assert result == "Dataset loaded!"
+        run = tracer.get_runs()[-1]
+        assert run.status == "success"
+        # Should have 2 llm_call events (one for tool call, one for final)
+        llm_calls = [e for e in run.events if e.event_type == "llm_call"]
+        assert len(llm_calls) == 2
+
+
+def test_agent_stops_at_max_iterations():
+    """Agent stops gracefully when max_iterations is reached."""
+    from agent.loop import run_agent
+
+    fn = MagicMock()
+    fn.name = "run_query"
+    fn.arguments = '{"query": "SELECT * FROM data"}'
+    tool_calls = [MagicMock(id="tc1", function=fn)]
+
+    with patch("agent.loop.client") as mock_client:
+        # Always return tool calls - agent should stop after max_iterations
+        mock_client.chat.completions.create = MagicMock(
+            return_value=_make_mock_response(None, tool_calls=tool_calls)
+        )
+
+        memory = WorkingMemory()
+        tracer = Tracer()
+        result = run_agent("Query data", memory, trace=tracer, max_iterations=3)
+
+        # Should return the graceful stop message
+        assert "stopped after reaching the maximum number of iterations (3)" in result
+        run = tracer.get_runs()[-1]
+        assert run.status == "stopped"
+        # Should have exactly 3 llm_call events
+        llm_calls = [e for e in run.events if e.event_type == "llm_call"]
+        assert len(llm_calls) == 3
+        # Should have max_iterations_reached event
+        max_iter_events = [e for e in run.events if e.event_type == "max_iterations_reached"]
+        assert len(max_iter_events) == 1
+        assert max_iter_events[0].metadata["max_iterations"] == 3
+        assert max_iter_events[0].metadata["final_iteration"] == 3
+
+
+def test_invalid_max_iterations_raises_value_error():
+    """Invalid max_iterations values raise ValueError."""
+    from agent.loop import run_agent
+
+    with patch("agent.loop.client") as mock_client:
+        mock_client.chat.completions.create = MagicMock(
+            return_value=_make_mock_response("OK")
+        )
+
+        memory = WorkingMemory()
+
+        # Test zero
+        try:
+            run_agent("test", memory, max_iterations=0)
+            assert False, "Expected ValueError for max_iterations=0"
+        except ValueError as e:
+            assert "positive integer" in str(e)
+
+        # Test negative
+        try:
+            run_agent("test", memory, max_iterations=-1)
+            assert False, "Expected ValueError for max_iterations=-1"
+        except ValueError as e:
+            assert "positive integer" in str(e)
+
+        # Test non-integer
+        try:
+            run_agent("test", memory, max_iterations=2.5)
+            assert False, "Expected ValueError for max_iterations=2.5"
+        except ValueError as e:
+            assert "positive integer" in str(e)
+
+        # Test string
+        try:
+            run_agent("test", memory, max_iterations="5")
+            assert False, "Expected ValueError for max_iterations='5'"
+        except ValueError as e:
+            assert "positive integer" in str(e)
+
+
+def test_agent_validation_failure_allows_retry_within_limit():
+    """Validation failures count as iterations and allow retry within limit."""
+    from agent.loop import run_agent
+
+    # First call: tool call that will fail validation
+    fn1 = MagicMock()
+    fn1.name = "run_query"
+    fn1.arguments = '{"query": "SELECT AVG(value) FROM data"}'
+    tool_calls_1 = [MagicMock(id="tc1", function=fn1)]
+
+    # Second call: tool call again (retry after validation failure)
+    fn2 = MagicMock()
+    fn2.name = "run_query"
+    fn2.arguments = '{"query": "SELECT AVG(value) FROM data"}'
+    tool_calls_2 = [MagicMock(id="tc2", function=fn2)]
+
+    # Third call: final response
+    tool_calls_3 = []
+
+    with patch("agent.loop.client") as mock_client:
+        responses = [
+            _make_mock_response(None, tool_calls=tool_calls_1),
+            _make_mock_response(None, tool_calls=tool_calls_2),
+            _make_mock_response("Corrected result!", tool_calls=tool_calls_3),
+        ]
+        mock_client.chat.completions.create = MagicMock(side_effect=responses)
+
+        memory = WorkingMemory()
+        tracer = Tracer()
+        result = run_agent("Calculate average", memory, trace=tracer, max_iterations=5)
+
+        assert result == "Corrected result!"
+        run = tracer.get_runs()[-1]
+        assert run.status == "success"
+        llm_calls = [e for e in run.events if e.event_type == "llm_call"]
+        assert len(llm_calls) == 3

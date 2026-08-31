@@ -28,7 +28,6 @@ class ToolResult:
         parts.append(f"- {self.name}({self.arguments}) → success={success}")
         if dur is not None:
             parts[-1] += f" ({dur}ms)"
-
             if success:
                 if "row_count" in data:
                     parts.append(f"  rows: {data['row_count']}")

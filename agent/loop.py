@@ -59,22 +59,33 @@ def run_agent(
     memory: WorkingMemory | None = None,
     trace: Tracer | None = None,
     run_id: str | None = None,
+    max_iterations: int = 5,
 ) -> str:
-    """Run a single agent turn, invoking dataset tools as needed.
+    """Run the agent loop with a bounded number of LLM iterations.
 
-    If *memory* is provided, all messages, tool calls, and results are
-    recorded there.  If *memory* is ``None`` a fresh ``WorkingMemory``
-    is created for the turn (useful for one-shot calls).
+    Each iteration consists of one LLM call followed by processing its
+    response (executing tool calls, validating results). The loop stops
+    when the LLM returns no tool calls, or when ``max_iterations`` is
+    reached.
 
-    If *trace* is provided, events are recorded.  If *trace* is ``None``,
-    a new local ``Tracer`` is created for the run and returned alongside
-    the response via the function's ``trace_id`` attribute — however, for
-    simplicity this function returns just the response string.  To capture
-    the trace, pass an existing ``Tracer`` instance.
+    Args:
+        user_message: The user's input message.
+        memory: Optional working memory to persist state across calls.
+        trace: Optional tracer for observability.
+        run_id: Optional run identifier for tracing.
+        max_iterations: Maximum number of LLM iterations (default: 5).
+            Must be a positive integer.
 
-    If *run_id* is provided, it is used as the trace run identifier;
-    otherwise the ``Tracer`` generates one.
+    Returns:
+        The final response content from the LLM, or a graceful message
+        if the iteration limit was reached.
+
+    Raises:
+        ValueError: If ``max_iterations`` is not a positive integer.
     """
+    if not isinstance(max_iterations, int) or max_iterations <= 0:
+        raise ValueError("max_iterations must be a positive integer")
+
     if memory is None:
         memory = WorkingMemory()
 
@@ -91,7 +102,9 @@ def run_agent(
         memory.messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
 
     try:
-        while True:
+        iteration = 0
+        while iteration < max_iterations:
+            iteration += 1
             # Build context for this turn
             context = context_builder.build(memory, tools=TOOLS)
             trace.log(
@@ -200,6 +213,18 @@ def run_agent(
 
                 # Update messages for the next LLM call
                 memory.add_tool_message(tc.id, str(result))
+
+            # Check if we've reached the iteration limit after processing tool calls
+            if iteration >= max_iterations:
+                trace.log(
+                    "max_iterations_reached",
+                    metadata={"max_iterations": max_iterations, "final_iteration": iteration},
+                )
+                trace.end_run(status="stopped")
+                return (
+                    f"Agent stopped after reaching the maximum number of iterations ({max_iterations}). "
+                    "The task may be incomplete. Please refine your request or try again."
+                )
 
     except Exception as exc:
         trace.log(
