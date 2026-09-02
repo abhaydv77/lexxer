@@ -8,7 +8,7 @@ The agent layer for the Data Analyst Agent harness.
 
 ## Agent Loop
 
-The `run_agent()` function orchestrates the LLM ↔ tools interaction:
+The `run_agent()` function orchestrates the LLM ↔ tools interaction with a **bounded iteration limit**:
 
 ```
 User message
@@ -21,7 +21,7 @@ Tool call → execution → result
     ↓
 Result stored in WorkingMemory
     ↓
-LLM continues (loop until no tool_calls)
+LLM continues (loop until no tool_calls OR max_iterations reached)
     ↓
 Final text response returned
 ```
@@ -35,6 +35,30 @@ Final text response returned
 | `FUNCTIONS` | Dict mapping tool names → Python function callables |
 | `TOOLS_OPENAI` | Tool schema list formatted for Groq/OpenAI API |
 | `SYSTEM_PROMPT` | Static system message guiding agent behavior |
+
+### Bounded Iterations
+
+The loop is bounded by `max_iterations` (default: **5**) to prevent infinite tool/validation retry loops.
+
+- **One iteration = one LLM call** followed by processing its response (tool execution + validation).
+- If the LLM returns no tool calls, the loop ends normally.
+- If `max_iterations` is reached:
+  - A `max_iterations_reached` trace event is logged
+  - The trace ends with status `"stopped"`
+  - A graceful message is returned instead of looping forever
+
+```python
+from agent.loop import run_agent
+from memory.working import WorkingMemory
+
+memory = WorkingMemory()
+
+# Default: 5 iterations
+response = run_agent("Load data/cities.csv", memory)
+
+# Custom limit
+response = run_agent("Complex analysis", memory, max_iterations=10)
+```
 
 ### Usage
 
@@ -69,3 +93,4 @@ Each turn's conversation state is tracked in a session-scoped `WorkingMemory`.
 - All messages, tool calls, and results are recorded in WorkingMemory
 - Dataset metadata from `load_dataset` is extracted and stored automatically
 - No classes needed — the loop is a pure function driven by explicit memory state
+- **Bounded loop**: `max_iterations` (default 5) prevents infinite retries; raises `ValueError` if not a positive integer
